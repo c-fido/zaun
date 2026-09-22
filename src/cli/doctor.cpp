@@ -13,6 +13,8 @@
 #include <cstdio>
 #include <cstring>
 #include <fstream>
+#include <iterator>
+#include <set>
 #include <sstream>
 #include <string>
 
@@ -105,11 +107,12 @@ void check_apparmor() {
 void check_cgroup() {
     std::string uid = std::to_string(getuid());
     std::string dir = "/sys/fs/cgroup/user.slice/user-" + uid + ".slice/user@" + uid + ".service";
-    std::string controllers = " " + read_file(dir + "/cgroup.controllers");
+    std::istringstream words(read_file(dir + "/cgroup.controllers"));
+    std::set<std::string> controllers{std::istream_iterator<std::string>(words), {}};
     bool writable = access(dir.c_str(), W_OK) == 0;
     std::string missing;
     for (const char* c : {"cpu", "memory", "pids"}) {
-        if (controllers.find(std::string(" ") + c) == std::string::npos) missing += std::string(" ") + c;
+        if (!controllers.count(c)) missing += std::string(" ") + c;
     }
     if (writable && missing.empty()) {
         report(Status::ok, "cgroup", "delegated: " + dir);
