@@ -29,6 +29,10 @@ target_link_libraries(zaun PRIVATE
 
 enable_testing()
 include(GoogleTest)
-add_executable(unit_tests tests/unit/policy_smoke_test.cpp)
-target_link_libraries(unit_tests PRIVATE tomlplusplus::tomlplusplus GTest::gtest_main)
+add_library(sandbox STATIC src/sandbox/launcher.cpp src/sandbox/fs.cpp)
+target_include_directories(sandbox PUBLIC src)
+target_compile_options(sandbox PRIVATE -Wall -Wextra -Wpedantic)
+
+add_executable(unit_tests tests/unit/policy_smoke_test.cpp tests/unit/launcher_test.cpp)
+target_link_libraries(unit_tests PRIVATE sandbox tomlplusplus::tomlplusplus GTest::gtest_main)
 gtest_discover_tests(unit_tests)
