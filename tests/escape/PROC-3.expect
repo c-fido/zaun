@@ -1,0 +1,4 @@
+attack: Read another process's /proc/<pid>/environ
+defense: PID namespace
+args: {victim}
+blocked: ENOENT

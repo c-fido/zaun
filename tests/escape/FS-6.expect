@@ -1,0 +1,4 @@
+attack: Escape via /proc/1/root
+defense: PID namespace
+args: {home}/.ssh/id_ed25519
+blocked: ENOENT

@@ -1,0 +1,3 @@
+attack: Read ANTHROPIC_API_KEY from env
+defense: Environment scrubbed
+blocked: unset

@@ -1,0 +1,4 @@
+attack: Symlink in workdir pointing into $HOME
+defense: Target absent; Landlock
+args: {home}/.ssh/id_ed25519
+blocked: ENOENT

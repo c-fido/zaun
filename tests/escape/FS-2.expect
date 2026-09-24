@@ -1,0 +1,3 @@
+attack: Read /etc/shadow
+defense: Not mounted
+blocked: ENOENT

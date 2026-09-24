@@ -9,17 +9,14 @@
 
 #include <cerrno>
 #include <cstdio>
+#include <exception>
 #include <filesystem>
-#include <system_error>
 
-#include "sandbox/fs.h"
+#include "sandbox/check.h"
+#include "sandbox/init.h"
 
 namespace zaun {
 namespace {
-
-void check(bool ok, const std::string& what) {
-    if (!ok) throw std::system_error(errno, std::generic_category(), what);
-}
 
 void write_file(const std::string& path, const std::string& s) {
     int fd = open(path.c_str(), O_WRONLY | O_CLOEXEC);
@@ -36,24 +33,39 @@ void write_file(const std::string& path, const std::string& s) {
     try {
         char c;
         check(read(sync_fd, &c, 1) == 1, "wait for id maps");
-        close(sync_fd);
-        setup_fs(workdir);
-        std::vector<char*> args;
-        for (const auto& a : argv) args.push_back(const_cast<char*>(a.c_str()));
-        args.push_back(nullptr);
-        // ponytail: target runs as PID 1; step 3 adds a reaping init.
-        execvp(args[0], args.data());
-        check(false, argv[0]);
+        // Init must not hold host fds either: the target could reach them via /proc/1/fd.
+        check(close_range(3, ~0U, 0) == 0, "close_range");
     } catch (const std::exception& e) {
         std::fprintf(stderr, "zaun: %s\n", e.what());
+        _exit(125);
     }
-    _exit(125);
+    run_init(workdir, argv);
 }
+
+// Blocks `set` for the calling thread until destroyed.
+class SignalBlock {
+public:
+    explicit SignalBlock(const sigset_t& set) {
+        check(sigprocmask(SIG_BLOCK, &set, &old_) == 0, "sigprocmask");
+    }
+    ~SignalBlock() { sigprocmask(SIG_SETMASK, &old_, nullptr); }
+    SignalBlock(const SignalBlock&) = delete;
+    SignalBlock& operator=(const SignalBlock&) = delete;
+
+private:
+    sigset_t old_;
+};
 
 }  // namespace
 
 int launch(const std::string& workdir, const std::vector<std::string>& argv) {
     std::string dir = std::filesystem::canonical(workdir);
+    sigset_t waited;
+    sigemptyset(&waited);
+    sigaddset(&waited, SIGCHLD);
+    for (int sig : kForwardedSignals) sigaddset(&waited, sig);
+    SignalBlock block(waited);
+
     int sync[2];
     check(pipe2(sync, O_CLOEXEC) == 0, "pipe");
 
@@ -88,9 +100,17 @@ int launch(const std::string& workdir, const std::vector<std::string>& argv) {
     }
     close(sync[1]);
 
-    int status = 0;
-    check(waitpid(pid, &status, 0) == pid, "waitpid");
-    return WIFEXITED(status) ? WEXITSTATUS(status) : 128 + WTERMSIG(status);
+    for (;;) {
+        int sig = sigwaitinfo(&waited, nullptr);
+        if (sig == SIGCHLD) {
+            int status;
+            pid_t r = waitpid(pid, &status, WNOHANG);
+            check(r >= 0, "waitpid");
+            if (r == pid) return WIFEXITED(status) ? WEXITSTATUS(status) : 128 + WTERMSIG(status);
+        } else if (sig > 0) {
+            kill(pid, sig);
+        }
+    }
 }
 
 }  // namespace zaun

@@ -1,0 +1,6 @@
+attack: ptrace the supervisor
+defense: PID namespace; seccomp
+# The victim stands in for the supervisor; it allows any tracer, so Yama
+# ptrace_scope=1 doesn't stop the bare run.
+args: {victim}
+blocked: ESRCH

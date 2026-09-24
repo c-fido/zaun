@@ -1,0 +1,4 @@
+attack: kill(-1, SIGKILL)
+defense: PID namespace
+args: {victim} {pidns}
+blocked: ESRCH

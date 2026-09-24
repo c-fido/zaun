@@ -10,7 +10,8 @@
 #include <cerrno>
 #include <filesystem>
 #include <fstream>
-#include <system_error>
+
+#include "sandbox/check.h"
 
 namespace fs = std::filesystem;
 
@@ -18,10 +19,6 @@ namespace zaun {
 namespace {
 
 const std::string kOldRoot = "/.oldroot";
-
-void check(bool ok, const std::string& what) {
-    if (!ok) throw std::system_error(errno, std::generic_category(), what);
-}
 
 void do_mount(const char* src, const std::string& dst, const char* type, unsigned long flags,
               const char* data = nullptr) {

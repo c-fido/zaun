@@ -1,0 +1,4 @@
+attack: Read ~/.ssh/id_ed25519
+defense: Not mounted
+args: {home}/.ssh/id_ed25519
+blocked: ENOENT

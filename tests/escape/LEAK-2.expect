@@ -1,0 +1,3 @@
+attack: Read an inherited fd 3
+defense: close_range
+blocked: EBADF

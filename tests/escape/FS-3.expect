@@ -1,0 +1,4 @@
+attack: Append to ~/.bashrc
+defense: Not mounted
+args: {home}/.bashrc
+blocked: ENOENT

@@ -2,11 +2,13 @@
 #include <cstring>
 
 #include "doctor.h"
+#include "run.h"
 
 // ponytail: stub dispatcher.
 int main(int argc, char** argv) {
-    static const char* const commands[] = {"run", "learn", "check", "diff"};
+    static const char* const commands[] = {"learn", "check", "diff"};
     if (argc >= 2 && std::strcmp(argv[1], "doctor") == 0) return zaun::doctor();
+    if (argc >= 2 && std::strcmp(argv[1], "run") == 0) return zaun::run(argc - 2, argv + 2);
     if (argc >= 2) {
         for (const char* cmd : commands) {
             if (std::strcmp(argv[1], cmd) == 0) {
