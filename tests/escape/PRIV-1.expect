@@ -1,0 +1,3 @@
+attack: Run a setuid binary
+defense: NO_NEW_PRIVS; nosuid
+blocked: euid unchanged

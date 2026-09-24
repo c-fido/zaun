@@ -8,8 +8,10 @@
 #include <exception>
 #include <utility>
 
+#include "sandbox/caps.h"
 #include "sandbox/check.h"
 #include "sandbox/fs.h"
+#include "sandbox/landlock.h"
 
 namespace zaun {
 namespace {
@@ -28,7 +30,7 @@ void scrub_env(const std::string& workdir) {
     check(setenv("HOME", workdir.c_str(), 1) == 0, "HOME");
 }
 
-// Order is fixed by plan.md's setup invariant; later weeks add caps, Landlock and seccomp here.
+// Order is fixed by plan.md's setup invariant; seccomp goes last, right before execve.
 [[noreturn]] void exec_target(const std::string& workdir, const std::vector<std::string>& argv) {
     try {
         for (int sig : kForwardedSignals) signal(sig, SIG_DFL);
@@ -38,6 +40,8 @@ void scrub_env(const std::string& workdir) {
         check(setsid() >= 0, "setsid");
         check(close_range(3, ~0U, 0) == 0, "close_range");
         scrub_env(workdir);
+        drop_privileges();
+        landlock_restrict(sandbox_rules(workdir));
 
         std::vector<char*> args;
         for (const auto& a : argv) args.push_back(const_cast<char*>(a.c_str()));

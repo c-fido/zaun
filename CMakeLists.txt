@@ -22,7 +22,9 @@ FetchContent_MakeAvailable(tomlplusplus nlohmann_json googletest)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(SECCOMP REQUIRED IMPORTED_TARGET libseccomp)
 
-add_library(sandbox STATIC src/sandbox/launcher.cpp src/sandbox/init.cpp src/sandbox/fs.cpp)
+add_library(sandbox STATIC
+  src/sandbox/launcher.cpp src/sandbox/init.cpp src/sandbox/fs.cpp src/sandbox/caps.cpp
+  src/sandbox/landlock.cpp)
 target_include_directories(sandbox PUBLIC src)
 target_compile_options(sandbox PRIVATE -Wall -Wextra -Wpedantic)
 
@@ -39,7 +41,7 @@ target_link_libraries(unit_tests PRIVATE sandbox tomlplusplus::tomlplusplus GTes
 gtest_discover_tests(unit_tests)
 
 # Escape suite: one program per attack, run by tests/escape/run.py.
-set(ESCAPE_TESTS FS-1 FS-2 FS-3 FS-4 FS-6 PROC-1 PROC-2 PROC-3 LEAK-1 LEAK-2)
+set(ESCAPE_TESTS FS-1 FS-2 FS-3 FS-4 FS-6 PROC-1 PROC-2 PROC-3 PRIV-1 LEAK-1 LEAK-2)
 foreach(id IN LISTS ESCAPE_TESTS ITEMS victim)
   add_executable(escape_${id} tests/escape/${id}.c)
   target_compile_definitions(escape_${id} PRIVATE _GNU_SOURCE)

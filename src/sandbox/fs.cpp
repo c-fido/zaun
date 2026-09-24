@@ -19,6 +19,9 @@ namespace zaun {
 namespace {
 
 const std::string kOldRoot = "/.oldroot";
+const char* const kSystemDirs[] = {"/usr", "/lib", "/lib64", "/bin"};
+const char* const kEtcFiles[] = {"/etc/ld.so.cache", "/etc/ssl/certs"};
+const char* const kDevices[] = {"/dev/null", "/dev/zero", "/dev/full", "/dev/random", "/dev/urandom"};
 
 void do_mount(const char* src, const std::string& dst, const char* type, unsigned long flags,
               const char* data = nullptr) {
@@ -70,9 +73,8 @@ void setup_fs(const std::string& workdir) {
     check(syscall(SYS_pivot_root, "/tmp", ("/tmp" + kOldRoot).c_str()) == 0, "pivot_root");
     check(chdir("/") == 0, "chdir /");
 
-    for (const char* p : {"/usr", "/lib", "/lib64", "/bin", "/etc/ld.so.cache", "/etc/ssl/certs"}) {
-        bind(p, MS_RDONLY | MS_NOSUID | MS_NODEV);
-    }
+    for (const char* p : kSystemDirs) bind(p, MS_RDONLY | MS_NOSUID | MS_NODEV);
+    for (const char* p : kEtcFiles) bind(p, MS_RDONLY | MS_NOSUID | MS_NODEV);
 
     fs::create_directory("/tmp");
     // ponytail: /tmp is unsized; week 3 adds limits.
@@ -80,9 +82,7 @@ void setup_fs(const std::string& workdir) {
 
     fs::create_directory("/dev");
     do_mount("tmpfs", "/dev", "tmpfs", MS_NOSUID | MS_NOEXEC, "size=64k,mode=0755");
-    for (const char* d : {"/dev/null", "/dev/zero", "/dev/full", "/dev/random", "/dev/urandom"}) {
-        bind(d, MS_NOSUID | MS_NOEXEC);
-    }
+    for (const char* d : kDevices) bind(d, MS_NOSUID | MS_NOEXEC);
 
     fs::create_directories("/etc");
     std::ofstream passwd("/etc/passwd");
@@ -99,6 +99,20 @@ void setup_fs(const std::string& workdir) {
     check(umount2(kOldRoot.c_str(), MNT_DETACH) == 0, "umount " + kOldRoot);
     fs::remove(kOldRoot);
     check(chdir(workdir.c_str()) == 0, "chdir " + workdir);
+}
+
+std::vector<PathRule> sandbox_rules(const std::string& workdir) {
+    std::vector<PathRule> rules;
+    for (const char* p : kSystemDirs) rules.push_back({p, kRead | kExec});
+    // The root tmpfs, /etc and /dev are writable at the mount level; Landlock keeps them read-only.
+    rules.push_back({"/etc", kRead});
+    rules.push_back({"/proc", kRead});
+    rules.push_back({"/dev", kRead});
+    for (const char* d : kDevices) rules.push_back({d, kRead | kWrite});
+    for (const std::string& p : {std::string("/tmp"), workdir}) {
+        rules.push_back({p, kRead | kWrite | kExec | kRefer});
+    }
+    return rules;
 }
 
 }  // namespace zaun

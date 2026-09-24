@@ -58,6 +58,28 @@ TEST_F(Launcher, LocksDownTarget) {
     unsetenv("ZAUN_TEST_SECRET");
 }
 
+TEST_F(Launcher, DropsPrivileges) {
+    std::string script =
+        "for set in CapInh CapPrm CapEff CapBnd CapAmb; do\n"
+        "  grep -q \"^$set:.0000000000000000$\" /proc/self/status || exit 10\n"
+        "done\n"
+        "grep -q '^NoNewPrivs:.1$' /proc/self/status || exit 11\n";
+    EXPECT_EQ(zaun::launch(dir_, {"/bin/sh", "-c", script}), 0);
+}
+
+// Mounts leave /, /etc and /dev writable by the target; Landlock must not.
+TEST_F(Launcher, LandlockConfinesWrites) {
+    std::string script =
+        "touch out /tmp/x || exit 10\n"
+        "echo hi > /dev/null || exit 11\n"
+        "touch /x 2>/dev/null && exit 12\n"
+        "echo x 2>/dev/null >> /etc/passwd && exit 13\n"
+        "touch /dev/x 2>/dev/null && exit 14\n"
+        "cat /etc/passwd > /dev/null || exit 15\n"
+        "exit 0\n";
+    EXPECT_EQ(zaun::launch(dir_, {"/bin/sh", "-c", script}), 0);
+}
+
 TEST_F(Launcher, PropagatesExitStatus) {
     EXPECT_EQ(zaun::launch(dir_, {"/bin/sh", "-c", "exit 7"}), 7);
     EXPECT_EQ(zaun::launch(dir_, {"/bin/sh", "-c", "kill -TERM $$"}), 128 + SIGTERM);

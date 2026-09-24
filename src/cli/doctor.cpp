@@ -1,10 +1,8 @@
 #include "doctor.h"
 
 #include <fcntl.h>
-#include <linux/landlock.h>
 #include <sched.h>
 #include <sys/mount.h>
-#include <sys/syscall.h>
 #include <sys/utsname.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -17,6 +15,8 @@
 #include <set>
 #include <sstream>
 #include <string>
+
+#include "sandbox/landlock.h"
 
 namespace zaun {
 namespace {
@@ -57,7 +57,7 @@ void check_kernel() {
 }
 
 void check_landlock() {
-    long abi = syscall(SYS_landlock_create_ruleset, nullptr, 0, LANDLOCK_CREATE_RULESET_VERSION);
+    int abi = landlock_abi();
     if (abi < 1) {
         report(Status::fail, "landlock", std::string("unavailable: ") + std::strerror(errno));
     } else {
