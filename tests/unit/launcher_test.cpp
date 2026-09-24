@@ -28,7 +28,7 @@ protected:
 // Each check exits with its own code so a failure names the check.
 TEST_F(Launcher, IsolatesFilesystem) {
     std::string script =
-        "opts() { awk -v p=\"$1\" '$2 == p { print \",\" $4 \",\" }' /proc/mounts; }\n"
+        "opts() { while read -r _ mp _ o _; do [ \"$mp\" = \"$1\" ] && echo \",$o,\"; done < /proc/mounts; }\n"
         "test $PPID = 1 || exit 10\n"
         "test \"$(id -u)\" = " + std::to_string(getuid()) + " || exit 11\n"
         "test \"$(pwd)\" = " + dir_ + " || exit 12\n"
