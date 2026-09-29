@@ -3,6 +3,7 @@
 #include <fcntl.h>
 #include <linux/sched.h>
 #include <signal.h>
+#include <sys/prctl.h>
 #include <sys/syscall.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -30,6 +31,7 @@ void write_file(const std::string& path, const std::string& s) {
 [[noreturn]] void run_child(int sync_fd, const SandboxPlan& plan,
                             const std::vector<std::string>& argv) {
     try {
+        prctl(PR_SET_PDEATHSIG, SIGKILL);
         char c;
         check(read(sync_fd, &c, 1) == 1, "wait for id maps");
         // Init must not hold host fds either: the target could reach them via /proc/1/fd.

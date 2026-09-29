@@ -3,7 +3,7 @@
 # Remove: limactl delete -f zaun
 set -euo pipefail
 
-repo="$(cd "$(dirname "$0")/.." && pwd)"
+repo="$(cd "$(dirname "$0")/.." && /bin/pwd -P)"  # /bin/pwd -P: on-disk case (bash builtin keeps typed case); macOS is case-insensitive, the VM isn't
 command -v limactl >/dev/null || brew install lima
 
 if limactl list -q 2>/dev/null | grep -qx zaun; then
