@@ -28,6 +28,7 @@ constexpr uint64_t kFileRights = LANDLOCK_ACCESS_FS_EXECUTE | LANDLOCK_ACCESS_FS
 uint64_t fs_rights(unsigned access) {
     uint64_t r = 0;
     if (access & kRead) r |= LANDLOCK_ACCESS_FS_READ_FILE | LANDLOCK_ACCESS_FS_READ_DIR;
+    if (access & kList) r |= LANDLOCK_ACCESS_FS_READ_DIR;
     if (access & kWrite) {
         r |= LANDLOCK_ACCESS_FS_WRITE_FILE | LANDLOCK_ACCESS_FS_REMOVE_DIR |
              LANDLOCK_ACCESS_FS_REMOVE_FILE | LANDLOCK_ACCESS_FS_MAKE_DIR |

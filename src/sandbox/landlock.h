@@ -6,8 +6,15 @@
 namespace zaun {
 
 // What a path rule grants. kWrite covers creating, removing and truncating;
-// kRefer allows renaming or linking across directories.
-enum PathAccess : unsigned { kRead = 1u << 0, kWrite = 1u << 1, kExec = 1u << 2, kRefer = 1u << 3 };
+// kRefer allows renaming or linking across directories; kList lists
+// directories without reading files.
+enum PathAccess : unsigned {
+    kRead = 1u << 0,
+    kWrite = 1u << 1,
+    kExec = 1u << 2,
+    kRefer = 1u << 3,
+    kList = 1u << 4,
+};
 
 struct PathRule {
     std::string path;

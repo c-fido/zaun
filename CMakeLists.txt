@@ -24,20 +24,26 @@ pkg_check_modules(SECCOMP REQUIRED IMPORTED_TARGET libseccomp)
 
 add_library(sandbox STATIC
   src/sandbox/launcher.cpp src/sandbox/init.cpp src/sandbox/fs.cpp src/sandbox/caps.cpp
-  src/sandbox/landlock.cpp)
+  src/sandbox/landlock.cpp src/sandbox/seccomp.cpp)
 target_include_directories(sandbox PUBLIC src)
 target_compile_options(sandbox PRIVATE -Wall -Wextra -Wpedantic)
+target_link_libraries(sandbox PRIVATE PkgConfig::SECCOMP)
+
+add_library(policy STATIC src/policy/policy.cpp src/policy/compile.cpp)
+target_compile_options(policy PRIVATE -Wall -Wextra -Wpedantic)
+target_link_libraries(policy PUBLIC sandbox PRIVATE tomlplusplus::tomlplusplus)
 
 add_executable(zaun src/cli/main.cpp src/cli/doctor.cpp src/cli/run.cpp)
 target_compile_options(zaun PRIVATE -Wall -Wextra -Wpedantic)
-target_link_libraries(zaun PRIVATE
-  sandbox tomlplusplus::tomlplusplus nlohmann_json::nlohmann_json PkgConfig::SECCOMP)
+target_link_libraries(zaun PRIVATE policy nlohmann_json::nlohmann_json)
 
 enable_testing()
 include(GoogleTest)
 
-add_executable(unit_tests tests/unit/policy_smoke_test.cpp tests/unit/launcher_test.cpp)
-target_link_libraries(unit_tests PRIVATE sandbox tomlplusplus::tomlplusplus GTest::gtest_main)
+add_executable(unit_tests
+  tests/unit/policy_test.cpp tests/unit/compile_test.cpp tests/unit/seccomp_test.cpp
+  tests/unit/launcher_test.cpp)
+target_link_libraries(unit_tests PRIVATE policy GTest::gtest_main)
 gtest_discover_tests(unit_tests)
 
 # Escape suite: one program per attack, run by tests/escape/run.py.

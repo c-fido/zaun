@@ -19,8 +19,6 @@ namespace zaun {
 namespace {
 
 const std::string kOldRoot = "/.oldroot";
-const char* const kSystemDirs[] = {"/usr", "/lib", "/lib64", "/bin"};
-const char* const kEtcFiles[] = {"/etc/ld.so.cache", "/etc/ssl/certs"};
 const char* const kDevices[] = {"/dev/null", "/dev/zero", "/dev/full", "/dev/random", "/dev/urandom"};
 
 void do_mount(const char* src, const std::string& dst, const char* type, unsigned long flags,
@@ -44,7 +42,8 @@ void bind(const std::string& path, unsigned long flags) {
     if (S_ISDIR(st.st_mode)) {
         fs::create_directory(path);
     } else {
-        int fd = open(path.c_str(), O_CREAT | O_WRONLY | O_CLOEXEC, 0644);
+        // Read-only: the mount point may already exist inside a read-only bind.
+        int fd = open(path.c_str(), O_CREAT | O_RDONLY | O_CLOEXEC, 0644);
         check(fd >= 0, "create " + path);
         close(fd);
     }
@@ -64,7 +63,7 @@ void bind(const std::string& path, unsigned long flags) {
 
 }  // namespace
 
-void setup_fs(const std::string& workdir) {
+void setup_fs(const SandboxPlan& plan) {
     do_mount(nullptr, "/", nullptr, MS_REC | MS_PRIVATE);
 
     // pivot_root onto a tmpfs over /tmp; the host /tmp stays reachable under the old root.
@@ -73,9 +72,7 @@ void setup_fs(const std::string& workdir) {
     check(syscall(SYS_pivot_root, "/tmp", ("/tmp" + kOldRoot).c_str()) == 0, "pivot_root");
     check(chdir("/") == 0, "chdir /");
 
-    for (const char* p : kSystemDirs) bind(p, MS_RDONLY | MS_NOSUID | MS_NODEV);
-    for (const char* p : kEtcFiles) bind(p, MS_RDONLY | MS_NOSUID | MS_NODEV);
-
+    // Before the binds, so a workdir under /tmp lands on top of the fresh tmpfs.
     fs::create_directory("/tmp");
     // ponytail: /tmp is unsized; week 3 adds limits.
     do_mount("tmpfs", "/tmp", "tmpfs", MS_NOSUID | MS_NODEV, "mode=1777");
@@ -84,13 +81,15 @@ void setup_fs(const std::string& workdir) {
     do_mount("tmpfs", "/dev", "tmpfs", MS_NOSUID | MS_NOEXEC, "size=64k,mode=0755");
     for (const char* d : kDevices) bind(d, MS_NOSUID | MS_NOEXEC);
 
+    for (const Bind& b : plan.binds) {
+        bind(b.path, (b.writable ? 0 : MS_RDONLY) | MS_NOSUID | MS_NODEV);
+    }
+
     fs::create_directories("/etc");
     std::ofstream passwd("/etc/passwd");
-    passwd << "zaun:x:" << getuid() << ':' << getgid() << "::" << workdir << ":/bin/sh\n";
+    passwd << "zaun:x:" << getuid() << ':' << getgid() << "::" << plan.workdir << ":/bin/sh\n";
     passwd.close();
     check(passwd.good(), "write /etc/passwd");
-
-    bind(workdir, MS_NOSUID | MS_NODEV);
 
     // proc must be mounted while the host's /proc is still visible.
     fs::create_directory("/proc");
@@ -98,20 +97,18 @@ void setup_fs(const std::string& workdir) {
 
     check(umount2(kOldRoot.c_str(), MNT_DETACH) == 0, "umount " + kOldRoot);
     fs::remove(kOldRoot);
-    check(chdir(workdir.c_str()) == 0, "chdir " + workdir);
+    check(chdir(plan.workdir.c_str()) == 0, "chdir " + plan.workdir);
 }
 
-std::vector<PathRule> sandbox_rules(const std::string& workdir) {
-    std::vector<PathRule> rules;
-    for (const char* p : kSystemDirs) rules.push_back({p, kRead | kExec});
+std::vector<PathRule> sandbox_rules() {
+    // Listing is harmless: mounts decide what exists. Without it `ls /` fails.
+    std::vector<PathRule> rules = {{"/", kList}};
     // The root tmpfs, /etc and /dev are writable at the mount level; Landlock keeps them read-only.
     rules.push_back({"/etc", kRead});
     rules.push_back({"/proc", kRead});
     rules.push_back({"/dev", kRead});
     for (const char* d : kDevices) rules.push_back({d, kRead | kWrite});
-    for (const std::string& p : {std::string("/tmp"), workdir}) {
-        rules.push_back({p, kRead | kWrite | kExec | kRefer});
-    }
+    rules.push_back({"/tmp", kRead | kWrite | kExec | kRefer});
     return rules;
 }
 

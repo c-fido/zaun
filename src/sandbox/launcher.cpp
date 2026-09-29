@@ -10,7 +10,6 @@
 #include <cerrno>
 #include <cstdio>
 #include <exception>
-#include <filesystem>
 
 #include "sandbox/check.h"
 #include "sandbox/init.h"
@@ -28,7 +27,7 @@ void write_file(const std::string& path, const std::string& s) {
     check(ok, path);
 }
 
-[[noreturn]] void run_child(int sync_fd, const std::string& workdir,
+[[noreturn]] void run_child(int sync_fd, const SandboxPlan& plan,
                             const std::vector<std::string>& argv) {
     try {
         char c;
@@ -39,7 +38,7 @@ void write_file(const std::string& path, const std::string& s) {
         std::fprintf(stderr, "zaun: %s\n", e.what());
         _exit(125);
     }
-    run_init(workdir, argv);
+    run_init(plan, argv);
 }
 
 // Blocks `set` for the calling thread until destroyed.
@@ -58,8 +57,7 @@ private:
 
 }  // namespace
 
-int launch(const std::string& workdir, const std::vector<std::string>& argv) {
-    std::string dir = std::filesystem::canonical(workdir);
+int launch(const SandboxPlan& plan, const std::vector<std::string>& argv) {
     sigset_t waited;
     sigemptyset(&waited);
     sigaddset(&waited, SIGCHLD);
@@ -76,7 +74,7 @@ int launch(const std::string& workdir, const std::vector<std::string>& argv) {
     pid_t pid = static_cast<pid_t>(syscall(SYS_clone3, &args, sizeof args));
     if (pid == 0) {
         close(sync[1]);
-        run_child(sync[0], dir, argv);
+        run_child(sync[0], plan, argv);
     }
     int err = errno;
     close(sync[0]);
