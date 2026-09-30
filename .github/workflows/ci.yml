@@ -36,6 +36,18 @@ jobs:
       - name: Doctor
         run: ./build/zaun doctor
 
+  tidy:
+    name: clang-tidy
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install toolchain
+        run: sudo apt-get update && sudo apt-get install -y clang clang-tidy cmake ninja-build pkg-config libseccomp-dev
+      - name: Configure
+        run: cmake -S . -B build -G Ninja -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_BUILD_TYPE=Debug
+      - name: clang-tidy
+        run: clang-tidy -p build --quiet src/*/*.cpp
+
   escape:
     name: escape suite
     runs-on: ubuntu-24.04

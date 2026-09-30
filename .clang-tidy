@@ -1,0 +1,11 @@
+Checks: >
+  -*,
+  bugprone-*,
+  -bugprone-easily-swappable-parameters,
+  clang-analyzer-*,
+  performance-*,
+  -performance-enum-size,
+  -performance-inefficient-vector-operation,
+  -performance-inefficient-string-concatenation
+WarningsAsErrors: '*'
+HeaderFilterRegex: '.*/src/.*'
