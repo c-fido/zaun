@@ -1,0 +1,4 @@
+attack: Remount / read-write
+defense: Caps dropped; seccomp
+# The first mount() is killed before caps matter.
+blocked: signal SIGSYS

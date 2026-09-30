@@ -1,0 +1,3 @@
+attack: clone3 with namespace flags
+defense: clone3 returns ENOSYS
+blocked: ENOSYS

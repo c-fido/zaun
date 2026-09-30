@@ -1,0 +1,3 @@
+attack: openat through io_uring
+defense: io_uring_setup denied
+blocked: signal SIGSYS

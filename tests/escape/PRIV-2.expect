@@ -1,0 +1,3 @@
+attack: unshare(CLONE_NEWUSER)
+defense: Seccomp always-deny
+blocked: signal SIGSYS

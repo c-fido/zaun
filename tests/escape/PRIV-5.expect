@@ -1,0 +1,4 @@
+attack: bpf, perf_event_open, userfaultfd
+defense: Seccomp always-deny
+# Each call runs in a child; all three must die of SIGSYS.
+blocked: SIGSYS

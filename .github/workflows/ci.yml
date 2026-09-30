@@ -44,7 +44,10 @@ jobs:
       - name: Install toolchain
         run: sudo apt-get update && sudo apt-get install -y clang cmake ninja-build pkg-config libseccomp-dev
       - name: Kernel settings
-        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+        # legacy_tiocsti: TTY-1 must succeed bare, and TIOCSTI is off by default.
+        run: |
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          sudo sysctl -w dev.tty.legacy_tiocsti=1
       - name: Configure
         run: cmake -S . -B build -G Ninja -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_BUILD_TYPE=Debug
       - name: Build

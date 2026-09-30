@@ -1,0 +1,4 @@
+attack: 32-bit syscall via int 0x80
+defense: Bad-arch action kills
+arch: x86_64
+blocked: signal SIGSYS

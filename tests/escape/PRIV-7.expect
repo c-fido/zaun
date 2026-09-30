@@ -1,0 +1,3 @@
+attack: Read the session keyring with keyctl
+defense: Seccomp always-deny
+blocked: signal SIGSYS

@@ -1,0 +1,4 @@
+attack: Rename or hardlink a file out of the workdir
+defense: Landlock REFER; mount boundary
+# Both the mount boundary and Landlock's REFER check fail with EXDEV.
+blocked: EXDEV

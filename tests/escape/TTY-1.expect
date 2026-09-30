@@ -1,0 +1,6 @@
+attack: Inject keystrokes with TIOCSTI
+defense: setsid; ioctl filter
+# The harness gives stdin a pty that is the controlling terminal. Under zaun
+# setsid drops it, and the ioctl filter denies TIOCSTI either way.
+tty: yes
+blocked: EPERM

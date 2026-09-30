@@ -8,16 +8,22 @@ Each tests/escape/<ID>.expect sidecar holds `key: value` lines:
   args             - optional; {home}, {victim} and {pidns} are substituted
   blocked          - expected reason under zaun: an errno name, a string the
                      test prints, or "signal SIGxxx" if zaun kills it
+  tty              - "yes" to give stdin a pty that is the controlling terminal
+  arch             - skip unless running on this machine type (e.g. x86_64)
 """
 
 import argparse
+import fcntl
 import os
+import platform
+import pty
 import shlex
 import shutil
 import signal
 import subprocess
 import sys
 import tempfile
+import termios
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -68,18 +74,32 @@ class Victim:
         self.proc.wait()
 
 
-def run_attack(binary, args, secret, env, zaun=None):
+def run_attack(binary, args, secret, env, zaun=None, tty=False):
     with tempfile.TemporaryDirectory(prefix="zaun-escape-wd-") as workdir:
         shutil.copy2(binary, workdir)
         cmd = [f"./{binary.name}", *args]
         if zaun:
             cmd = [zaun, "run", "--workdir", workdir, "--", *cmd]
-        return subprocess.run(["sh", "-c", FD3_WRAPPER, secret, *cmd], cwd=workdir, env=env,
-                              capture_output=True, text=True, timeout=60)
+        extra = {}
+        if tty:
+            master, slave = pty.openpty()
+            extra = dict(stdin=slave, start_new_session=True,
+                         preexec_fn=lambda: fcntl.ioctl(0, termios.TIOCSCTTY, 0))
+        try:
+            return subprocess.run(["sh", "-c", FD3_WRAPPER, secret, *cmd], cwd=workdir, env=env,
+                                  capture_output=True, text=True, timeout=60, **extra)
+        finally:
+            if tty:
+                os.close(master)
+                os.close(slave)
 
 
 def run_test(test_id, sidecar, bindir, zaun, home, secret, env):
     """Returns (status, detail)."""
+    arch = sidecar.get("arch")
+    if arch and platform.machine() != arch:
+        return "SKIP", f"needs {arch}, this is {platform.machine()}"
+    tty = sidecar.get("tty") == "yes"
     binary = bindir / test_id
     if not binary.exists():
         return "BROKEN", f"{binary} not built"
@@ -89,7 +109,7 @@ def run_test(test_id, sidecar, bindir, zaun, home, secret, env):
                  "pidns": os.readlink("/proc/self/ns/pid")}
         args = [a.format(**subst) for a in shlex.split(sidecar.get("args", ""))]
 
-        escaped, reason = outcome(run_attack(binary, args, secret, env))
+        escaped, reason = outcome(run_attack(binary, args, secret, env, tty=tty))
         if not escaped:
             return "BROKEN", f"bare run did not escape ({reason})"
 
@@ -99,7 +119,7 @@ def run_test(test_id, sidecar, bindir, zaun, home, secret, env):
             subst["victim"] = str(victim.proc.pid)
             args = [a.format(**subst) for a in shlex.split(sidecar.get("args", ""))]
 
-        escaped, reason = outcome(run_attack(binary, args, secret, env, zaun))
+        escaped, reason = outcome(run_attack(binary, args, secret, env, zaun, tty))
         if escaped:
             return "FAIL", f"escaped under zaun: {reason}"
         if not victim.alive:
@@ -147,13 +167,15 @@ def main():
     finally:
         shutil.rmtree(home)
 
-    passed = sum(r[3] == "PASS" for r in rows)
-    print(f"\n{passed}/{len(rows)} blocked")
+    ran = [r for r in rows if r[3] != "SKIP"]
+    passed = sum(r[3] == "PASS" for r in ran)
+    summary = f"{passed}/{len(ran)} blocked" + (f", {len(rows) - len(ran)} skipped" if len(ran) < len(rows) else "")
+    print(f"\n{summary}")
     if opts.results:
         table = ["| ID | Attack | Expected defense | Result | Detail |", "|---|---|---|---|---|"]
         table += ["| " + " | ".join(r) + " |" for r in rows]
-        opts.results.write_text(f"{passed}/{len(rows)} blocked\n\n" + "\n".join(table) + "\n")
-    return 0 if passed == len(rows) else 1
+        opts.results.write_text(f"{summary}\n\n" + "\n".join(table) + "\n")
+    return 0 if passed == len(ran) else 1
 
 
 if __name__ == "__main__":
