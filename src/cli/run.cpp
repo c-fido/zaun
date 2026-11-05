@@ -40,11 +40,6 @@ int run(int argc, char** argv) {
     try {
         Policy policy = policy_path ? load_policy(policy_path) : parse_policy(kBaselinePolicy, "baseline");
         SandboxPlan plan = compile(policy, workdir ? workdir : policy.workdir.value_or("."));
-        const Limits& l = plan.limits;
-        if (l.memory || l.pids || l.cpu > 0 || l.timeout.count()) {
-            // ponytail: week 3 enforces limits.
-            std::fprintf(stderr, "zaun: warning: [limits] are not enforced yet\n");
-        }
         return launch(plan, std::vector<std::string>(argv + i, argv + argc));
     } catch (const std::exception& e) {
         std::fprintf(stderr, "zaun: %s\n", e.what());

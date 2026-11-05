@@ -74,8 +74,10 @@ void setup_fs(const SandboxPlan& plan) {
 
     // Before the binds, so a workdir under /tmp lands on top of the fresh tmpfs.
     fs::create_directory("/tmp");
-    // ponytail: /tmp is unsized; week 3 adds limits.
-    do_mount("tmpfs", "/tmp", "tmpfs", MS_NOSUID | MS_NODEV, "mode=1777");
+    // tmpfs pages count against memory.max; the size also bounds /tmp under rlimits.
+    std::string tmp_opts = "mode=1777";
+    if (plan.limits.memory) tmp_opts += ",size=" + std::to_string(plan.limits.memory);
+    do_mount("tmpfs", "/tmp", "tmpfs", MS_NOSUID | MS_NODEV, tmp_opts.c_str());
 
     fs::create_directory("/dev");
     do_mount("tmpfs", "/dev", "tmpfs", MS_NOSUID | MS_NOEXEC, "size=64k,mode=0755");

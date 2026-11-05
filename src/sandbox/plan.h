@@ -16,7 +16,7 @@ struct Bind {
     bool writable;
 };
 
-// Zero means unlimited. Parsed now, enforced from week 3.
+// Zero means unlimited.
 struct Limits {
     uint64_t memory = 0;  // bytes
     uint64_t pids = 0;

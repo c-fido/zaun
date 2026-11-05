@@ -32,7 +32,7 @@ provision:
       apt-get update
       apt-get install -y clang cmake ninja-build pkg-config libseccomp-dev hyperfine
       # Dev/CI only.
-      echo kernel.apparmor_restrict_unprivileged_userns=0 >/etc/sysctl.d/60-zaun.conf
+      printf '%s\n' kernel.apparmor_restrict_unprivileged_userns=0 dev.tty.legacy_tiocsti=1 >/etc/sysctl.d/60-zaun.conf
       sysctl --system
 EOF
   limactl start --name=zaun --tty=false "$cfg"
@@ -44,6 +44,7 @@ limactl shell --workdir "$repo" zaun bash -c '
   uname -srm
   cmake -S . -B build-vm -G Ninja -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_BUILD_TYPE=Debug
   cmake --build build-vm
-  ctest --test-dir build-vm --output-on-failure
+  # A delegated scope, so the cgroup tests run instead of skipping.
+  systemd-run --user --scope -q --same-dir ctest --test-dir build-vm --output-on-failure
 '
 echo "VM ready. Shell in with: limactl shell --workdir \"$repo\" zaun"
