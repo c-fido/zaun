@@ -24,16 +24,17 @@ pkg_check_modules(SECCOMP REQUIRED IMPORTED_TARGET libseccomp)
 
 add_library(sandbox STATIC
   src/sandbox/launcher.cpp src/sandbox/init.cpp src/sandbox/fs.cpp src/sandbox/caps.cpp
-  src/sandbox/landlock.cpp src/sandbox/seccomp.cpp src/cgroup/cgroup.cpp)
+  src/sandbox/landlock.cpp src/sandbox/seccomp.cpp src/cgroup/cgroup.cpp src/learn/tracer.cpp)
 target_include_directories(sandbox PUBLIC src)
 target_compile_options(sandbox PRIVATE -Wall -Wextra -Wpedantic)
 target_link_libraries(sandbox PRIVATE PkgConfig::SECCOMP)
 
-add_library(policy STATIC src/policy/policy.cpp src/policy/compile.cpp)
+add_library(policy STATIC src/policy/policy.cpp src/policy/compile.cpp src/learn/generalize.cpp)
 target_compile_options(policy PRIVATE -Wall -Wextra -Wpedantic)
 target_link_libraries(policy PUBLIC sandbox PRIVATE tomlplusplus::tomlplusplus)
 
-add_executable(zaun src/cli/main.cpp src/cli/doctor.cpp src/cli/run.cpp)
+add_executable(zaun src/cli/main.cpp src/cli/doctor.cpp src/cli/run.cpp src/cli/learn.cpp
+  src/cli/check.cpp src/cli/options.cpp src/report/report.cpp)
 target_compile_options(zaun PRIVATE -Wall -Wextra -Wpedantic)
 target_link_libraries(zaun PRIVATE policy nlohmann_json::nlohmann_json)
 
@@ -42,7 +43,8 @@ include(GoogleTest)
 
 add_executable(unit_tests
   tests/unit/policy_test.cpp tests/unit/compile_test.cpp tests/unit/seccomp_test.cpp
-  tests/unit/launcher_test.cpp tests/unit/cgroup_test.cpp)
+  tests/unit/launcher_test.cpp tests/unit/cgroup_test.cpp tests/unit/generalize_test.cpp
+  tests/unit/learn_test.cpp)
 target_link_libraries(unit_tests PRIVATE policy GTest::gtest_main)
 gtest_discover_tests(unit_tests)
 

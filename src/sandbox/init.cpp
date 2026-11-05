@@ -39,17 +39,21 @@ void scrub_env(const SandboxPlan& plan) {
         sigemptyset(&none);
         check(sigprocmask(SIG_SETMASK, &none, nullptr) == 0, "sigprocmask");
         check(setsid() >= 0, "setsid");
-        check(close_range(3, ~0U, 0) == 0, "close_range");
+        const bool notify = uses_notify(plan);
+        check(close_range(notify ? kNotifyFd + 1 : 3, ~0U, 0) == 0, "close_range");
         scrub_env(plan);
         drop_privileges();
-        std::vector<PathRule> rules = sandbox_rules();
-        rules.insert(rules.end(), plan.landlock.begin(), plan.landlock.end());
-        landlock_restrict(rules);
+        // Learning observes; mounts and seccomp still confine it.
+        if (!plan.learn) {
+            std::vector<PathRule> rules = sandbox_rules();
+            rules.insert(rules.end(), plan.landlock.begin(), plan.landlock.end());
+            landlock_restrict(rules);
+        }
 
         std::vector<char*> args;
         for (const auto& a : argv) args.push_back(const_cast<char*>(a.c_str()));
         args.push_back(nullptr);
-        seccomp_install(plan.seccomp);
+        seccomp_install(plan.seccomp, plan.learn, notify ? kNotifyFd : -1);
         execvp(args[0], args.data());
         check(false, argv[0]);
     } catch (const std::exception& e) {
@@ -81,6 +85,7 @@ void run_init(const SandboxPlan& plan, const std::vector<std::string>& argv) {
         target = fork();
         check(target >= 0, "fork");
         if (target == 0) exec_target(plan, argv);
+        if (uses_notify(plan)) close(kNotifyFd);
     } catch (const std::exception& e) {
         std::fprintf(stderr, "zaun: %s\n", e.what());
         _exit(125);

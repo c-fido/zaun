@@ -58,4 +58,15 @@ void Cgroup::add(pid_t pid) { write_file(dir_ + "/cgroup.procs", std::to_string(
 
 void Cgroup::kill() { write_file(dir_ + "/cgroup.kill", "1"); }
 
+uint64_t Cgroup::value(const std::string& file, const std::string& key) const {
+    std::ifstream in(dir_ + "/" + file);
+    std::string k;
+    uint64_t v;
+    if (key.empty()) return in >> v ? v : 0;
+    while (in >> k >> v) {
+        if (k == key) return v;
+    }
+    return 0;
+}
+
 }  // namespace zaun

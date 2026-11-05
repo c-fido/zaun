@@ -2,6 +2,7 @@
 
 #include <sys/types.h>
 
+#include <cstdint>
 #include <string>
 
 #include "sandbox/plan.h"
@@ -22,6 +23,8 @@ public:
     void add(pid_t pid);
     // Kills every process in the cgroup.
     void kill();
+    // A number from a control file: the whole file, or the "key N" line. 0 if absent.
+    uint64_t value(const std::string& file, const std::string& key = "") const;
     const std::string& path() const { return dir_; }
 
 private:

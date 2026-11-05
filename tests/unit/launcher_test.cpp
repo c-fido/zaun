@@ -26,7 +26,7 @@ protected:
     // Runs argv in dir_ under `policy` (default: the baseline).
     int launch(const std::vector<std::string>& argv,
                const std::string& policy = zaun::kBaselinePolicy) {
-        return zaun::launch(zaun::compile(zaun::parse_policy(policy), dir_), argv);
+        return zaun::launch(zaun::compile(zaun::parse_policy(policy), dir_), argv).exit_code;
     }
 
     std::string dir_;

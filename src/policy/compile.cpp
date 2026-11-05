@@ -9,30 +9,46 @@
 namespace fs = std::filesystem;
 
 namespace zaun {
-namespace {
 
-// True if `dir` is `path` or one of its ancestors, by whole components.
 bool contains(const std::string& dir, const std::string& path) {
     if (dir == "/") return true;
     return path.compare(0, dir.size(), dir) == 0 &&
            (path.size() == dir.size() || path[dir.size()] == '/');
 }
 
+namespace {
+
+// The canonical workdir; throws if it is missing or overlaps a sandbox path.
+std::string check_workdir(const std::string& workdir) {
+    std::error_code ec;
+    std::string dir = fs::canonical(workdir, ec).string();
+    if (ec) throw PolicyError("workdir " + workdir + ": " + ec.message());
+    if (!fs::is_directory(dir)) throw PolicyError("workdir " + workdir + ": not a directory");
+    for (std::string owned : kSandboxPaths) {
+        // A workdir under /tmp is fine: it's bound on top of the fresh tmpfs.
+        if (contains(dir, owned) || (owned != "/tmp" && contains(owned, dir))) {
+            throw PolicyError("workdir " + dir + " overlaps " + owned + ", which the sandbox provides");
+        }
+    }
+    return dir;
+}
+
 }  // namespace
+
+SandboxPlan compile_learn(const std::string& workdir, const std::string& home, const Limits& limits) {
+    SandboxPlan plan;
+    plan.workdir = check_workdir(workdir);
+    plan.binds.push_back({plan.workdir, true});
+    plan.learn = true;
+    for (const char* s : kSecretPaths) plan.hide.push_back(home + "/" + s);
+    plan.env = Policy{}.env;
+    plan.limits = limits;
+    return plan;
+}
 
 SandboxPlan compile(const Policy& policy, const std::string& workdir) {
     SandboxPlan plan;
-    std::error_code ec;
-    plan.workdir = fs::canonical(workdir, ec).string();
-    if (ec) throw PolicyError("workdir " + workdir + ": " + ec.message());
-    if (!fs::is_directory(plan.workdir)) throw PolicyError("workdir " + workdir + ": not a directory");
-    for (std::string owned : kSandboxPaths) {
-        // A workdir under /tmp is fine: it's bound on top of the fresh tmpfs.
-        if (contains(plan.workdir, owned) || (owned != "/tmp" && contains(owned, plan.workdir))) {
-            throw PolicyError("workdir " + plan.workdir + " overlaps " + owned +
-                              ", which the sandbox provides");
-        }
-    }
+    plan.workdir = check_workdir(workdir);
 
     // Per path: Landlock access and whether the bind is writable.
     std::map<std::string, std::pair<unsigned, bool>> grants;

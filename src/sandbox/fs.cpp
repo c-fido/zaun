@@ -27,6 +27,40 @@ void do_mount(const char* src, const std::string& dst, const char* type, unsigne
     check(mount(src, dst.c_str(), type, flags, data) == 0, "mount " + dst);
 }
 
+constexpr unsigned kLockedDown = MOUNT_ATTR_RDONLY | MOUNT_ATTR_NOSUID | MOUNT_ATTR_NODEV;
+
+// Learn view: every top-level host entry but these, read-only with all submounts.
+const char* const kLearnSkip[] = {"proc", "sys", "dev", "tmp", "run"};
+
+void bind_tree(const std::string& name) {
+    std::string path = "/" + name;
+    std::string src = kOldRoot + path;
+    struct stat st;
+    check(lstat(src.c_str(), &st) == 0, "stat " + src);
+    if (S_ISLNK(st.st_mode)) {
+        fs::create_symlink(fs::read_symlink(src), path);
+    } else if (S_ISDIR(st.st_mode)) {
+        fs::create_directory(path);
+        do_mount(src.c_str(), path, nullptr, MS_BIND | MS_REC);
+        mount_attr attr{};
+        attr.attr_set = kLockedDown;
+        check(mount_setattr(AT_FDCWD, path.c_str(), AT_RECURSIVE, &attr, sizeof attr) == 0,
+              "mount_setattr " + path);
+    }
+}
+
+// Covers `path` with an empty read-only directory or file. Missing paths are skipped.
+void hide(const std::string& path) {
+    struct stat st;
+    if (stat(path.c_str(), &st) < 0) return;
+    if (S_ISDIR(st.st_mode)) {
+        do_mount("tmpfs", path, "tmpfs", MS_RDONLY | MS_NOSUID | MS_NODEV | MS_NOEXEC, "size=4k,mode=0700");
+    } else {
+        do_mount("/dev/null", path, nullptr, MS_BIND);
+        do_mount(nullptr, path, nullptr, MS_REMOUNT | MS_BIND | MS_RDONLY | MS_NOSUID | MS_NODEV | MS_NOEXEC);
+    }
+}
+
 // Binds host `path` at the same path, then remounts with `flags`. Missing paths are skipped.
 void bind(const std::string& path, unsigned long flags) {
     std::string src = kOldRoot + path;
@@ -73,6 +107,15 @@ void setup_fs(const SandboxPlan& plan) {
     check(syscall(SYS_pivot_root, "/tmp", ("/tmp" + kOldRoot).c_str()) == 0, "pivot_root");
     check(chdir("/") == 0, "chdir /");
 
+    if (plan.learn) {
+        for (const auto& entry : fs::directory_iterator(kOldRoot)) {
+            std::string name = entry.path().filename();
+            bool skip = false;
+            for (const char* s : kLearnSkip) skip = skip || name == s;
+            if (!skip) bind_tree(name);
+        }
+    }
+
     // Before the binds, so a workdir under /tmp lands on top of the fresh tmpfs.
     fs::create_directory("/tmp");
     // tmpfs pages are host RAM, so /tmp is always sized: at the memory limit, or kDefaultTmpSize.
@@ -89,11 +132,15 @@ void setup_fs(const SandboxPlan& plan) {
         bind(b.path, (b.writable ? 0 : MS_RDONLY) | MS_NOSUID | MS_NODEV);
     }
 
-    fs::create_directories("/etc");
-    std::ofstream passwd("/etc/passwd");
-    passwd << "zaun:x:" << getuid() << ':' << getgid() << "::" << plan.workdir << ":/bin/sh\n";
-    passwd.close();
-    check(passwd.good(), "write /etc/passwd");
+    if (plan.learn) {
+        for (const auto& h : plan.hide) hide(h);
+    } else {
+        fs::create_directories("/etc");
+        std::ofstream passwd("/etc/passwd");
+        passwd << "zaun:x:" << getuid() << ':' << getgid() << "::" << plan.workdir << ":/bin/sh\n";
+        passwd.close();
+        check(passwd.good(), "write /etc/passwd");
+    }
 
     // proc must be mounted while the host's /proc is still visible.
     fs::create_directory("/proc");

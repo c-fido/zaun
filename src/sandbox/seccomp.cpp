@@ -5,8 +5,12 @@
 #include <seccomp.h>
 #include <sys/ioctl.h>
 
+#include <unistd.h>
+
 #include <memory>
 #include <system_error>
+
+#include "learn/tracer.h"
 
 namespace zaun {
 namespace {
@@ -30,6 +34,9 @@ const char* const kBaseSet[] = {
     "execve", "exit", "exit_group", "rt_sigreturn", "futex", "clone3",
     "clock_gettime", "clock_getres", "clock_nanosleep", "gettimeofday", "nanosleep",
 };
+
+// Hand the listener fd to the supervisor; never notified, or the handover would deadlock.
+const char* const kHandover[] = {"sendmsg", "close"};
 
 // CLONE_NEWTIME is left out: in clone() that bit is part of the exit signal.
 constexpr unsigned long kNamespaceFlags[] = {
@@ -83,17 +90,39 @@ void load_baseline() {
     check_rc(seccomp_load(f.get()), "seccomp_load");
 }
 
-// Stacks on the baseline filter; the kernel applies the stricter verdict.
-void load_allowlist(const std::vector<std::string>& allow) {
-    Filter f = new_filter(SCMP_ACT_ERRNO(EPERM));
-    auto add = [&](const std::string& name) {
-        int nr = resolve(name);
-        if (nr < 0) return;
-        check_rc(seccomp_rule_add(f.get(), SCMP_ACT_ALLOW, nr, 0), name);
-    };
-    for (const char* name : kBaseSet) add(name);
-    for (const auto& name : allow) add(name);
+void allow(const Filter& f, const std::string& name) {
+    int nr = resolve(name);
+    if (nr < 0) return;
+    check_rc(seccomp_rule_add(f.get(), SCMP_ACT_ALLOW, nr, 0), name);
+}
+
+// Loads `f` and, with a socket, sends its notification fd to the supervisor.
+void load(const Filter& f, int sock) {
     check_rc(seccomp_load(f.get()), "seccomp_load");
+    if (sock < 0) return;
+    int listener = seccomp_notify_fd(f.get());
+    check_rc(listener, "seccomp_notify_fd");
+    send_fd(sock, listener);
+    close(listener);
+    close(sock);
+}
+
+// Stacks on the baseline filter; the kernel applies the stricter verdict.
+void load_allowlist(const std::vector<std::string>& names, int sock) {
+    Filter f = new_filter(sock < 0 ? SCMP_ACT_ERRNO(EPERM) : SCMP_ACT_NOTIFY);
+    for (const char* name : kBaseSet) allow(f, name);
+    if (sock >= 0) {
+        for (const char* name : kHandover) allow(f, name);
+    }
+    for (const auto& name : names) allow(f, name);
+    load(f, sock);
+}
+
+// Every call but the handover goes to the supervisor, which lets it run.
+void load_tracer(int sock) {
+    Filter f = new_filter(SCMP_ACT_NOTIFY);
+    for (const char* name : kHandover) allow(f, name);
+    load(f, sock);
 }
 
 }  // namespace
@@ -109,9 +138,13 @@ bool always_denied(const std::string& name) {
     return false;
 }
 
-void seccomp_install(const SeccompPlan& plan) {
+void seccomp_install(const SeccompPlan& plan, bool trace, int sock) {
     load_baseline();
-    if (plan.allowlist) load_allowlist(plan.allow);
+    if (trace) {
+        load_tracer(sock);
+    } else if (plan.allowlist) {
+        load_allowlist(plan.allow, sock);
+    }
 }
 
 }  // namespace zaun

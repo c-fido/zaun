@@ -234,11 +234,11 @@ Policy parse_policy(const std::string& text, const std::string& source) {
 }
 
 uint64_t parse_size(const std::string& s, const std::string& what) {
-    return Reader(what).size(toml::value<std::string>(s), what);
+    return Reader("command line").size(toml::value<std::string>(s), what);
 }
 
 std::chrono::milliseconds parse_duration(const std::string& s, const std::string& what) {
-    return Reader(what).duration(toml::value<std::string>(s), what);
+    return Reader("command line").duration(toml::value<std::string>(s), what);
 }
 
 Policy load_policy(const std::string& path) {

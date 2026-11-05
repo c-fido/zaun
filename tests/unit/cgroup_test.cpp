@@ -41,7 +41,7 @@ protected:
 
     int launch(const std::string& limits, const std::string& script) {
         std::string policy = std::string(zaun::kBaselinePolicy) + "[limits]\n" + limits;
-        return zaun::launch(zaun::compile(zaun::parse_policy(policy), dir_), {"/bin/sh", "-c", script});
+        return zaun::launch(zaun::compile(zaun::parse_policy(policy), dir_), {"/bin/sh", "-c", script}).exit_code;
     }
 
     std::string dir_;

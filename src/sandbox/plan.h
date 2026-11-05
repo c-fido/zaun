@@ -32,6 +32,14 @@ struct SandboxPlan {
     std::vector<std::string> env;  // variables kept; HOME is always the workdir
     SeccompPlan seccomp;
     Limits limits;
+    // Learn view: the host root read-only except /proc, /sys, /dev, /tmp and /run
+    // (host sockets), `hide` covered with empty mounts, no Landlock, and every
+    // syscall traced. binds then holds only the workdir.
+    bool learn = false;
+    std::vector<std::string> hide;
 };
+
+// True if the target hands a seccomp listener to the supervisor.
+inline bool uses_notify(const SandboxPlan& plan) { return plan.learn || plan.seccomp.allowlist; }
 
 }  // namespace zaun
