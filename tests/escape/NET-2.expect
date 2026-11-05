@@ -1,0 +1,3 @@
+attack: DNS lookup
+defense: No route, no resolver
+blocked: EAI_AGAIN

@@ -19,6 +19,7 @@ namespace zaun {
 namespace {
 
 const std::string kOldRoot = "/.oldroot";
+constexpr uint64_t kDefaultTmpSize = 256ULL << 20;
 const char* const kDevices[] = {"/dev/null", "/dev/zero", "/dev/full", "/dev/random", "/dev/urandom"};
 
 void do_mount(const char* src, const std::string& dst, const char* type, unsigned long flags,
@@ -74,10 +75,11 @@ void setup_fs(const SandboxPlan& plan) {
 
     // Before the binds, so a workdir under /tmp lands on top of the fresh tmpfs.
     fs::create_directory("/tmp");
-    // tmpfs pages count against memory.max; the size also bounds /tmp under rlimits.
-    std::string tmp_opts = "mode=1777";
-    if (plan.limits.memory) tmp_opts += ",size=" + std::to_string(plan.limits.memory);
-    do_mount("tmpfs", "/tmp", "tmpfs", MS_NOSUID | MS_NODEV, tmp_opts.c_str());
+    // tmpfs pages are host RAM, so /tmp is always sized: at the memory limit, or kDefaultTmpSize.
+    // ponytail: fixed default; add a [limits] key if a workload needs more.
+    uint64_t tmp_size = plan.limits.memory ? plan.limits.memory : kDefaultTmpSize;
+    do_mount("tmpfs", "/tmp", "tmpfs", MS_NOSUID | MS_NODEV,
+             ("mode=1777,size=" + std::to_string(tmp_size)).c_str());
 
     fs::create_directory("/dev");
     do_mount("tmpfs", "/dev", "tmpfs", MS_NOSUID | MS_NOEXEC, "size=64k,mode=0755");

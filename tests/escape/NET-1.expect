@@ -1,0 +1,3 @@
+attack: TCP connect to 1.1.1.1:443
+defense: Empty network namespace
+blocked: ENETUNREACH

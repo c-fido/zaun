@@ -1,0 +1,5 @@
+attack: Fork bomb (500 processes)
+defense: pids.max
+zaun_args: --pids 64
+needs: cgroup
+blocked: EAGAIN

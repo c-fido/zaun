@@ -47,8 +47,9 @@ target_link_libraries(unit_tests PRIVATE policy GTest::gtest_main)
 gtest_discover_tests(unit_tests)
 
 # Escape suite: one program per attack, run by tests/escape/run.py.
-set(ESCAPE_TESTS FS-1 FS-2 FS-3 FS-4 FS-5 FS-6 FS-7 PROC-1 PROC-2 PROC-3
-  PRIV-1 PRIV-2 PRIV-3 PRIV-4 PRIV-5 PRIV-6 PRIV-7 TTY-1 LEAK-1 LEAK-2)
+set(ESCAPE_TESTS FS-1 FS-2 FS-3 FS-4 FS-5 FS-6 FS-7 FS-8 NET-1 NET-2 NET-3 NET-4
+  PROC-1 PROC-2 PROC-3 PRIV-1 PRIV-2 PRIV-3 PRIV-4 PRIV-5 PRIV-6 PRIV-7 TTY-1
+  RES-1 RES-2 RES-3 LEAK-1 LEAK-2)
 foreach(id IN LISTS ESCAPE_TESTS ITEMS victim)
   add_executable(escape_${id} tests/escape/${id}.c)
   target_compile_definitions(escape_${id} PRIVATE _GNU_SOURCE)

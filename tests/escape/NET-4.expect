@@ -1,0 +1,4 @@
+attack: Connect to a socket file in host /tmp
+defense: Fresh tmpfs /tmp
+args: {victim}
+blocked: ENOENT

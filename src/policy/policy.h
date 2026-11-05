@@ -47,4 +47,9 @@ Policy parse_policy(const std::string& text, const std::string& source = "policy
 // Reads and parses a policy file. Throws PolicyError.
 Policy load_policy(const std::string& path);
 
+// Parse a size like "512M" or a duration like "60s", as in [limits]. `what`
+// names the value in errors. Throw PolicyError.
+uint64_t parse_size(const std::string& s, const std::string& what);
+std::chrono::milliseconds parse_duration(const std::string& s, const std::string& what);
+
 }  // namespace zaun

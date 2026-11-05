@@ -1,0 +1,5 @@
+attack: Allocate 1 GB
+defense: memory.max OOM kill
+zaun_args: --mem 256M
+needs: cgroup
+blocked: signal SIGKILL

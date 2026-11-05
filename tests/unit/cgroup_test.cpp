@@ -67,8 +67,7 @@ TEST(Cgroup, WritesLimits) {
 
 TEST_F(Limits, MemoryLimitKills) {
     REQUIRE_CGROUP();
-    // Writes to /tmp's tmpfs count against memory.max, so no interpreter is needed.
-    EXPECT_EQ(launch("memory = \"32M\"\n", "head -c 100000000 /dev/zero > /tmp/fill; exit 0"), 128 + SIGKILL);
+    EXPECT_EQ(launch("memory = \"32M\"\n", "python3 -c 'b = b\"x\" * (100 << 20)'; exit 0"), 128 + SIGKILL);
 }
 
 TEST_F(Limits, PidsLimitBlocksFork) {

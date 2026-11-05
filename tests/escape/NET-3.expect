@@ -1,0 +1,4 @@
+attack: Connect to an abstract Unix socket (D-Bus)
+defense: Network namespace scoping
+args: {victim}
+blocked: ECONNREFUSED

@@ -1,0 +1,4 @@
+attack: Infinite loop (4 s)
+defense: Timeout + cgroup.kill
+zaun_args: --timeout 1s
+blocked: signal SIGKILL

@@ -10,6 +10,8 @@ Each tests/escape/<ID>.expect sidecar holds `key: value` lines:
                      test prints, or "signal SIGxxx" if zaun kills it
   tty              - "yes" to give stdin a pty that is the controlling terminal
   arch             - skip unless running on this machine type (e.g. x86_64)
+  zaun_args        - optional extra `zaun run` options, e.g. limits
+  needs            - "cgroup" to skip unless a delegated cgroup is available
 """
 
 import argparse
@@ -72,14 +74,20 @@ class Victim:
         if self.alive:
             self.proc.kill()
         self.proc.wait()
+        Path(f"/tmp/zaun-escape-{self.proc.pid}.sock").unlink(missing_ok=True)
 
 
-def run_attack(binary, args, secret, env, zaun=None, tty=False):
+def have_cgroup():
+    """True if zaun can make a cgroup here: we run inside user@UID.service."""
+    return f"/user@{os.getuid()}.service/" in Path("/proc/self/cgroup").read_text()
+
+
+def run_attack(binary, args, secret, env, zaun=None, tty=False, zaun_args=()):
     with tempfile.TemporaryDirectory(prefix="zaun-escape-wd-") as workdir:
         shutil.copy2(binary, workdir)
         cmd = [f"./{binary.name}", *args]
         if zaun:
-            cmd = [zaun, "run", "--workdir", workdir, "--", *cmd]
+            cmd = [zaun, "run", "--workdir", workdir, *zaun_args, "--", *cmd]
         extra = {}
         if tty:
             master, slave = pty.openpty()
@@ -99,6 +107,8 @@ def run_test(test_id, sidecar, bindir, zaun, home, secret, env):
     arch = sidecar.get("arch")
     if arch and platform.machine() != arch:
         return "SKIP", f"needs {arch}, this is {platform.machine()}"
+    if sidecar.get("needs") == "cgroup" and not have_cgroup():
+        return "SKIP", "no delegated cgroup (run under systemd-run --user --scope)"
     tty = sidecar.get("tty") == "yes"
     binary = bindir / test_id
     if not binary.exists():
@@ -119,7 +129,8 @@ def run_test(test_id, sidecar, bindir, zaun, home, secret, env):
             subst["victim"] = str(victim.proc.pid)
             args = [a.format(**subst) for a in shlex.split(sidecar.get("args", ""))]
 
-        escaped, reason = outcome(run_attack(binary, args, secret, env, zaun, tty))
+        zaun_args = shlex.split(sidecar.get("zaun_args", ""))
+        escaped, reason = outcome(run_attack(binary, args, secret, env, zaun, tty, zaun_args))
         if escaped:
             return "FAIL", f"escaped under zaun: {reason}"
         if not victim.alive:

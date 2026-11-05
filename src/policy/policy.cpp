@@ -233,6 +233,14 @@ Policy parse_policy(const std::string& text, const std::string& source) {
     return p;
 }
 
+uint64_t parse_size(const std::string& s, const std::string& what) {
+    return Reader(what).size(toml::value<std::string>(s), what);
+}
+
+std::chrono::milliseconds parse_duration(const std::string& s, const std::string& what) {
+    return Reader(what).duration(toml::value<std::string>(s), what);
+}
+
 Policy load_policy(const std::string& path) {
     std::ifstream in(path);
     if (!in) throw PolicyError(path + ": cannot open");
