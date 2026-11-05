@@ -66,6 +66,8 @@ jobs:
         run: cmake --build build
       - name: Escape suite
         run: python3 tests/escape/run.py --results escape-results.md
+      - name: Python integration
+        run: ZAUN=build/zaun python3 integrations/py/test_zaun.py
       - name: Summary
         if: always()
         run: test -f escape-results.md && cat escape-results.md >> "$GITHUB_STEP_SUMMARY" || true
