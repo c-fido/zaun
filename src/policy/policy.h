@@ -33,7 +33,7 @@ inline constexpr const char* kBaselinePolicy = R"(version = 1
 name = "baseline"
 
 [filesystem]
-read = ["/etc/ld.so.cache", "/etc/ssl/certs"]
+read = ["/etc/ld.so.cache", "/etc/ssl/certs", "/etc/alternatives"]
 exec = ["/usr", "/lib", "/lib64", "/bin"]
 
 [syscalls]

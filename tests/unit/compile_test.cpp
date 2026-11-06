@@ -37,7 +37,7 @@ protected:
 TEST_F(Compile, Baseline) {
     zaun::SandboxPlan plan = zaun::compile(zaun::parse_policy(zaun::kBaselinePolicy), dir_);
     EXPECT_EQ(plan.workdir, std::filesystem::canonical(dir_).string());
-    ASSERT_EQ(plan.binds.size(), 7u);  // 4 exec + 2 read + workdir
+    ASSERT_EQ(plan.binds.size(), 8u);  // 4 exec + 3 read + workdir
     EXPECT_EQ(plan.binds[0].path, "/bin");
     for (const auto& b : plan.binds) EXPECT_EQ(b.writable, b.path == plan.workdir) << b.path;
     EXPECT_FALSE(plan.seccomp.allowlist);

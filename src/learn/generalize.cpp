@@ -112,6 +112,11 @@ public:
     void add(const std::string& raw, char access, int run, int depth = 0) {
         std::string path = fs::path(raw).lexically_normal().string();
         if (path.size() > 1 && path.back() == '/') path.pop_back();
+        // Before skipping: a binary in the workdir still needs its loader.
+        if (access == 'x' && depth < 4 && (contains(workdir_, path) || !sandbox_owned(path))) {
+            std::string interp = interpreter(path);
+            if (!interp.empty()) add(interp, 'x', run, depth + 1);
+        }
         if (skipped(path, access)) return;
         std::vector<std::string> symlinks;
         std::string real = resolve(path, symlinks);
@@ -122,10 +127,6 @@ public:
         }
         unsigned bits = access == 'x' ? kX : access == 'w' ? kW : access == 's' ? kStat : kR;
         record(real, bits, run);
-        if (access == 'x' && depth < 4) {
-            std::string interp = interpreter(real);
-            if (!interp.empty()) add(interp, 'x', run, depth + 1);
-        }
     }
 
     void syscall(const std::string& name, int run) {
@@ -175,6 +176,10 @@ private:
             workdir_written_ = workdir_written_ || access == 'w';
             return true;
         }
+        return sandbox_owned(path);
+    }
+
+    static bool sandbox_owned(const std::string& path) {
         for (const char* owned : kSandboxPaths) {
             if (contains(owned, path)) return true;
         }

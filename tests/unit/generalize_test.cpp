@@ -60,6 +60,13 @@ TEST_F(Generalize, ClassifiesAndFollowsExec) {
                             [](const std::string& s) { return s.find("/ld-linux") != std::string::npos; }));
 }
 
+TEST_F(Generalize, WorkdirBinaryKeepsItsLoader) {
+    std::filesystem::copy_file("/usr/bin/true", workdir_ + "/true");
+    zaun::Learned l = learn({{{{"execve", 'x', workdir_ + "/true"}, 1}}});
+    EXPECT_TRUE(std::any_of(l.policy.exec.begin(), l.policy.exec.end(),
+                            [](const std::string& s) { return s.find("/ld-linux") != std::string::npos; }));
+}
+
 TEST_F(Generalize, CollapsesUnderPrefixes) {
     const std::string dir = "/usr/share/common-licenses";
     zaun::Learned l = learn({{{{"openat", 'r', dir + "/GPL-2"}, 1},
