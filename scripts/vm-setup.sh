@@ -30,7 +30,7 @@ provision:
       set -eux
       export DEBIAN_FRONTEND=noninteractive
       apt-get update
-      apt-get install -y clang cmake ninja-build pkg-config libseccomp-dev hyperfine
+      apt-get install -y clang clang-tidy cmake ninja-build pkg-config libseccomp-dev hyperfine bubblewrap python3-pandas
       # Dev/CI only.
       printf '%s\n' kernel.apparmor_restrict_unprivileged_userns=0 dev.tty.legacy_tiocsti=1 >/etc/sysctl.d/60-zaun.conf
       sysctl --system
